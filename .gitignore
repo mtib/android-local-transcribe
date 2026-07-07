@@ -1,0 +1,16 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.keystore
+!debug.keystore
+
+# Large binary assets fetched via scripts/fetch-assets.sh (not committed; too big for git).
+/app/libs/*.aar
+/app/src/main/assets/models/
+
