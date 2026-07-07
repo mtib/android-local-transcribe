@@ -46,8 +46,12 @@ object RecordingController {
     private val _level = MutableStateFlow(0f)
     val level: StateFlow<Float> = _level.asStateFlow()
 
-    private val _waveform = MutableStateFlow<List<Float>>(emptyList())
+    private val _waveform = MutableStateFlow<List<Float>>(quietWaveform())
     val waveform: StateFlow<List<Float>> = _waveform.asStateFlow()
+
+    /** Emits the id of the most recently saved session so lists can refresh the moment it lands. */
+    private val _lastCompletedId = MutableStateFlow<String?>(null)
+    val lastCompletedId: StateFlow<String?> = _lastCompletedId.asStateFlow()
 
     val committed: StateFlow<String> get() = engine.committed
     val partial: StateFlow<String> get() = engine.partial
@@ -75,7 +79,8 @@ object RecordingController {
         currentId = id
         startedAt = now
         wavWriter = WavWriter(repo.audioFile(id), TranscriptionEngine.SAMPLE_RATE)
-        _waveform.value = emptyList()
+        // Pre-fill with a quiet history so bars scroll in from the right instead of growing in count.
+        _waveform.value = quietWaveform()
         _level.value = 0f
         _elapsedMs.value = 0L
 
@@ -136,8 +141,11 @@ object RecordingController {
             transcript,
         )
         currentId = null
+        _lastCompletedId.value = id
         return id
     }
+
+    private fun quietWaveform(): List<Float> = List(WAVEFORM_BARS) { 0f }
 
     private var origin: String = "phone"
 

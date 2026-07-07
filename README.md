@@ -14,7 +14,7 @@ car screen, with a single Start/Stop control.
 - **Minimal phone UI**: one "New recording" button and a list of past recordings.
 - **Live transcription** while recording (waveform + scrolling transcript), on phone and in the car.
 - **Multilingual** transcription (Parakeet-TDT v3 covers 25 European languages; it transcribes the
-  spoken language as-is).
+  spoken language as-is — no translation).
 - **Export / share** a recording's audio (WAV), text, or both, via the Android share sheet.
 - **Android Auto** surface with the same live waveform + transcript; no history browsing in the car.
 - **100% offline & private**: models bundled, no `INTERNET` permission, `allowBackup="false"`.
@@ -76,8 +76,3 @@ Audio and transcripts never leave the device. The app declares no `INTERNET` per
 egress is impossible at the OS level, and `allowBackup` is disabled so transcripts are not swept into
 cloud backups. Permissions used: `RECORD_AUDIO`, foreground-service (microphone), notifications, and
 `androidx.car.app.ACCESS_SURFACE` for the car drawing surface.
-
-## Roadmap seam
-
-`core/translate/Translator` is a no-op today. A bundled offline NMT model can be dropped in there to
-add real language translation without touching the recording pipeline.

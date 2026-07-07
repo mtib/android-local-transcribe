@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -64,7 +67,9 @@ fun RecordingListScreen(
     onNew: () -> Unit,
     onOpen: (String) -> Unit,
 ) {
-    LaunchedEffect(Unit) { vm.refresh() }
+    // Refresh on entry and again the instant a new session is saved (so it appears immediately).
+    val lastCompleted by RecordingController.lastCompletedId.collectAsState()
+    LaunchedEffect(lastCompleted) { vm.refresh() }
     val sessions by vm.sessions.collectAsState()
 
     Scaffold(
@@ -143,7 +148,7 @@ fun ActiveRecordingScreen(onStopped: () -> Unit) {
     LaunchedEffect(committed, partial) { transcriptScroll.animateScrollTo(transcriptScroll.maxValue) }
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(

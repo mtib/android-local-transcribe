@@ -9,7 +9,6 @@ import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
-import dev.mtib.localtranscribe.core.translate.Translator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,9 +24,7 @@ import kotlinx.coroutines.launch
  * inference never blocks the microphone. Finalized phrases accumulate in [committed]; the
  * in-progress phrase is decoded periodically into [partial] for a live scrolling transcript.
  */
-class TranscriptionEngine(
-    private val translator: Translator = Translator.Identity,
-) {
+class TranscriptionEngine {
     private var recognizer: OfflineRecognizer? = null
     private var vad: Vad? = null
 
@@ -176,7 +173,7 @@ class TranscriptionEngine(
         return try {
             stream.acceptWaveform(samples, SAMPLE_RATE)
             r.decode(stream)
-            translator.translate(r.getResult(stream).text)
+            r.getResult(stream).text
         } finally {
             stream.release()
         }
