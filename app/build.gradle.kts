@@ -26,13 +26,25 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
             // Signed with the debug keystore so personal sideload builds install without extra setup.
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    // Per-ABI split so we can ship a small arm64-only APK for real phones (the Redmi is arm64-v8a),
+    // while the default build still covers the x86_64 emulator.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = true
         }
     }
 

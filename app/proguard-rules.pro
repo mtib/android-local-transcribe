@@ -3,3 +3,12 @@
 
 # Car App Library
 -keep class androidx.car.app.** { *; }
+
+# kotlinx.serialization — keep generated serializers and Companion accessors.
+-keepclassmembers class dev.mtib.localtranscribe.** {
+    *** Companion;
+}
+-keepclasseswithmembers class dev.mtib.localtranscribe.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class dev.mtib.localtranscribe.**$$serializer { *; }
