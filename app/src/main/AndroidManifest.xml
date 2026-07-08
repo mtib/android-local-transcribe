@@ -5,9 +5,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Required to use NavigationTemplate (the template that grants the drawing surface). -->
-    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
-    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Intentionally NO android.permission.INTERNET: the app is fully on-device. -->
 
@@ -21,14 +19,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.LocalTranscribe">
-
-        <!-- Android Auto discovery -->
-        <meta-data
-            android:name="com.google.android.gms.car.application"
-            android:resource="@xml/automotive_app_desc" />
-        <meta-data
-            android:name="androidx.car.app.minCarApiLevel"
-            android:value="1" />
 
         <activity
             android:name=".phone.MainActivity"
@@ -46,15 +36,6 @@
             android:name=".phone.RecordingService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
-
-        <service
-            android:name=".auto.LocalTranscribeCarAppService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="androidx.car.app.CarAppService" />
-                <category android:name="androidx.car.app.category.NAVIGATION" />
-            </intent-filter>
-        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -1,6 +1,7 @@
 package dev.mtib.localtranscribe.core
 
 import android.content.Context
+import android.os.StatFs
 import dev.mtib.localtranscribe.core.asr.TranscriptionEngine
 import dev.mtib.localtranscribe.core.audio.AudioSource
 import dev.mtib.localtranscribe.core.session.RecordingMeta
@@ -19,15 +20,15 @@ import dev.mtib.localtranscribe.core.audio.WavWriter
 import kotlin.math.abs
 
 /**
- * Single source of truth for an in-progress recording, shared by the phone foreground service and
- * the Android Auto car app. Both feed it an [AudioSource]; it drives the [TranscriptionEngine],
- * writes the WAV, exposes live UI state, and persists the finished session.
+ * Single source of truth for an in-progress recording. Fed an [AudioSource], it drives the
+ * [TranscriptionEngine], writes the WAV, exposes live UI state, and persists the finished session.
  */
 object RecordingController {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val engine = TranscriptionEngine()
 
     private var repository: RecordingRepository? = null
+    private var appContext: Context? = null
     private var audioSource: AudioSource? = null
     private var wavWriter: WavWriter? = null
     private var currentId: String? = null
@@ -70,6 +71,7 @@ object RecordingController {
         if (_isRecording.value || _isPreparing.value) return
         _isPreparing.value = true
         val app = context.applicationContext
+        appContext = app
         engine.ensureLoaded(app)
         this.origin = origin
         val repo = repository ?: RecordingRepository(app).also { repository = it }
@@ -91,8 +93,21 @@ object RecordingController {
         source.start(::onAudio)
 
         ticker = scope.launch {
+            var sinceStorageCheck = 0
             while (_isRecording.value) {
-                _elapsedMs.value = System.currentTimeMillis() - startedAt
+                val elapsed = System.currentTimeMillis() - startedAt
+                _elapsedMs.value = elapsed
+                if (elapsed >= MAX_DURATION_MS) {
+                    launchStop()
+                    break
+                }
+                if (++sinceStorageCheck >= 50) { // ~every 5 s
+                    sinceStorageCheck = 0
+                    if (lowStorage()) {
+                        launchStop()
+                        break
+                    }
+                }
                 delay(100)
             }
         }
@@ -146,6 +161,17 @@ object RecordingController {
     }
 
     private fun quietWaveform(): List<Float> = List(WAVEFORM_BARS) { 0f }
+
+    private fun lowStorage(): Boolean {
+        val ctx = appContext ?: return false
+        return runCatching {
+            StatFs(ctx.filesDir.absolutePath).availableBytes < MIN_FREE_BYTES
+        }.getOrDefault(false)
+    }
+
+    /** Auto-stop guards so a forgotten recording can't run forever or fill storage. */
+    private const val MAX_DURATION_MS = 6L * 60 * 60 * 1000
+    private const val MIN_FREE_BYTES = 200L * 1024 * 1024
 
     private var origin: String = "phone"
 
