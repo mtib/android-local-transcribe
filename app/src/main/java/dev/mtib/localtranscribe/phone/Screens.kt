@@ -1,6 +1,7 @@
 package dev.mtib.localtranscribe.phone
 
 import android.media.MediaPlayer
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -72,23 +76,34 @@ fun RecordingListScreen(
     vm: RecordingsViewModel,
     onNew: () -> Unit,
     onOpen: (String) -> Unit,
+    onOpenActive: () -> Unit,
 ) {
     // Refresh on entry and again the instant a new session is saved (so it appears immediately).
     val lastCompleted by RecordingController.lastCompletedId.collectAsState()
     LaunchedEffect(lastCompleted) { vm.refresh() }
     val sessions by vm.sessions.collectAsState()
 
+    val recording by RecordingController.isRecording.collectAsState()
+    val preparing by RecordingController.isPreparing.collectAsState()
+    val finalizing by RecordingController.isFinalizing.collectAsState()
+    val active = recording || preparing || finalizing
+    val elapsed by RecordingController.elapsedMs.collectAsState()
+    val committed by RecordingController.committed.collectAsState()
+    val partial by RecordingController.partial.collectAsState()
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("Local Transcribe") }) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onNew,
-                icon = { Icon(Icons.Filled.Mic, contentDescription = null) },
-                text = { Text("New recording") },
-            )
+            if (!active) {
+                ExtendedFloatingActionButton(
+                    onClick = onNew,
+                    icon = { Icon(Icons.Filled.Mic, contentDescription = null) },
+                    text = { Text("New recording") },
+                )
+            }
         },
     ) { padding ->
-        if (sessions.isEmpty()) {
+        if (!active && sessions.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text(
                     "No recordings yet.\nTap “New recording” to start.",
@@ -101,10 +116,80 @@ fun RecordingListScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (active) {
+                    item(key = "ongoing") {
+                        OngoingCard(preparing, finalizing, elapsed, committed, partial, onOpenActive)
+                    }
+                }
                 items(sessions, key = { it.id }) { session ->
                     RecordingCard(session) { onOpen(session.id) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OngoingCard(
+    preparing: Boolean,
+    finalizing: Boolean,
+    elapsedMs: Long,
+    committed: String,
+    partial: String,
+    onClick: () -> Unit,
+) {
+    val label = when {
+        preparing -> "Loading model…"
+        finalizing -> "Finalizing…"
+        else -> "Recording"
+    }
+    val tail = (committed + if (partial.isBlank()) "" else " $partial").trim()
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (preparing || finalizing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.FiberManualRecord,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    Spacer(Modifier.size(8.dp))
+                    Text(label, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                }
+                if (!preparing) {
+                    Text(
+                        formatDuration(elapsedMs),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (tail.isBlank()) "Listening…" else tail,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Tap to open",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -139,15 +224,19 @@ fun ActiveRecordingScreen(onStopped: () -> Unit) {
     val context = LocalContext.current
     val isRecording by RecordingController.isRecording.collectAsState()
     val isPreparing by RecordingController.isPreparing.collectAsState()
+    val isFinalizing by RecordingController.isFinalizing.collectAsState()
     val elapsed by RecordingController.elapsedMs.collectAsState()
     val waveform by RecordingController.waveform.collectAsState()
     val committed by RecordingController.committed.collectAsState()
     val partial by RecordingController.partial.collectAsState()
 
-    var startedOnce by remember { mutableStateOf(false) }
-    LaunchedEffect(isRecording) {
-        if (isRecording) startedOnce = true
-        if (startedOnce && !isRecording) onStopped()
+    // Leave this screen only once the session is fully done (recorded, finalized, and saved),
+    // so a stopping session stays visible (as "Finalizing…") instead of vanishing.
+    val active = isRecording || isPreparing || isFinalizing
+    var wasActive by remember { mutableStateOf(false) }
+    LaunchedEffect(active) {
+        if (active) wasActive = true
+        if (wasActive && !active) onStopped()
     }
 
     val transcriptScroll = rememberScrollState()
@@ -158,7 +247,11 @@ fun ActiveRecordingScreen(onStopped: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            if (isPreparing) "Loading model…" else formatDuration(elapsed),
+            when {
+                isPreparing -> "Loading model…"
+                isFinalizing -> "Finalizing…"
+                else -> formatDuration(elapsed)
+            },
             fontSize = 44.sp,
             color = MaterialTheme.colorScheme.onBackground,
         )
@@ -180,12 +273,13 @@ fun ActiveRecordingScreen(onStopped: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         Button(
             onClick = { RecordingService.stop(context) },
+            enabled = isRecording,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             modifier = Modifier.fillMaxWidth().height(56.dp),
         ) {
             Icon(Icons.Filled.Stop, contentDescription = null)
-            Spacer(Modifier.height(0.dp))
-            Text("  Stop")
+            Spacer(Modifier.size(8.dp))
+            Text("Stop")
         }
     }
 }

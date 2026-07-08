@@ -24,6 +24,7 @@
             android:name=".phone.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|density|fontScale|locale|layoutDirection"
             android:theme="@style/Theme.LocalTranscribe">
             <intent-filter>

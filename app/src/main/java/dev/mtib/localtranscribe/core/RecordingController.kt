@@ -41,6 +41,10 @@ object RecordingController {
     private val _isPreparing = MutableStateFlow(false)
     val isPreparing: StateFlow<Boolean> = _isPreparing.asStateFlow()
 
+    /** True from stop() until the session is fully written, so the UI can keep it visible. */
+    private val _isFinalizing = MutableStateFlow(false)
+    val isFinalizing: StateFlow<Boolean> = _isFinalizing.asStateFlow()
+
     private val _elapsedMs = MutableStateFlow(0L)
     val elapsedMs: StateFlow<Long> = _elapsedMs.asStateFlow()
 
@@ -134,30 +138,37 @@ object RecordingController {
     suspend fun stop(): String? {
         if (!_isRecording.value) return null
         _isRecording.value = false
-        ticker?.cancel()
-        audioSource?.stop()
-        audioSource = null
-        engine.finish()
-        wavWriter?.close()
-        wavWriter = null
-        _level.value = 0f
+        _isFinalizing.value = true
+        val durationMs = System.currentTimeMillis() - startedAt
+        _elapsedMs.value = durationMs
+        try {
+            ticker?.cancel()
+            audioSource?.stop()
+            audioSource = null
+            engine.finish()
+            wavWriter?.close()
+            wavWriter = null
+            _level.value = 0f
 
-        val id = currentId ?: return null
-        val repo = repository ?: return null
-        val transcript = engine.committed.value.trim()
-        repo.save(
-            RecordingMeta(
-                id = id,
-                createdAt = startedAt,
-                durationMs = System.currentTimeMillis() - startedAt,
-                sampleRate = TranscriptionEngine.SAMPLE_RATE,
-                origin = origin,
-            ),
-            transcript,
-        )
-        currentId = null
-        _lastCompletedId.value = id
-        return id
+            val id = currentId ?: return null
+            val repo = repository ?: return null
+            val transcript = engine.committed.value.trim()
+            repo.save(
+                RecordingMeta(
+                    id = id,
+                    createdAt = startedAt,
+                    durationMs = durationMs,
+                    sampleRate = TranscriptionEngine.SAMPLE_RATE,
+                    origin = origin,
+                ),
+                transcript,
+            )
+            currentId = null
+            _lastCompletedId.value = id
+            return id
+        } finally {
+            _isFinalizing.value = false
+        }
     }
 
     private fun quietWaveform(): List<Float> = List(WAVEFORM_BARS) { 0f }
