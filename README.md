@@ -51,6 +51,19 @@ Then build:
 
 APKs land in `app/build/outputs/apk/`. The `arm64-v8a` release APK is the recommended one for phones.
 
+### Releases (CI)
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which fetches the assets, builds the
+release APKs, and publishes a GitHub release with the arm64 and universal APKs attached:
+
+```bash
+git tag v1.0.5 && git push origin v1.0.5
+```
+
+To keep CI-built releases installable as in-place updates (same signing key as local builds), set a
+`DEBUG_KEYSTORE_BASE64` repo secret to the base64 of your `~/.android/debug.keystore`. Without it, CI
+generates a fresh debug key and a new install is required.
+
 ## Install
 
 1. Download the APK to the device and open it; allow installing from unknown sources.

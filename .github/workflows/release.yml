@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build (e.g. v1.0.5)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+      DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      # The ~640 MB model + AAR are not in git; cache them so only the first run downloads.
+      - name: Cache model + AAR assets
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/libs
+            app/src/main/assets/models
+          key: assets-parakeet-v3-sherpa-1.13.3
+
+      - name: Fetch large assets
+        run: ./scripts/fetch-assets.sh
+
+      # Sign with the same debug keystore as local builds so releases install as updates.
+      # Optional: set the DEBUG_KEYSTORE_BASE64 repo secret. Without it, a fresh debug key is
+      # generated and users must uninstall before installing the new build.
+      - name: Restore debug keystore
+        if: env.DEBUG_KEYSTORE_BASE64 != ''
+        run: |
+          mkdir -p ~/.android
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+
+      - name: Build release APKs
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Stage APKs
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "out/android-local-transcribe-${TAG}-arm64.apk"
+          cp app/build/outputs/apk/release/app-universal-release.apk "out/android-local-transcribe-${TAG}.apk"
+          ls -lh out
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Local Transcribe ${{ env.TAG }}
+          generate_release_notes: true
+          files: out/*.apk
