@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
@@ -36,12 +37,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,6 +62,9 @@ import dev.mtib.localtranscribe.core.session.RecordingSession
 import dev.mtib.localtranscribe.phone.ui.Waveform
 import dev.mtib.localtranscribe.phone.ui.formatDuration
 import dev.mtib.localtranscribe.phone.ui.formatTimestamp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -196,7 +202,41 @@ fun RecordingDetailScreen(
     LaunchedEffect(id) { session = vm.repository.get(id) }
 
     val player = remember { MediaPlayer() }
+    var prepared by remember { mutableStateOf(false) }
     var playing by remember { mutableStateOf(false) }
+    var positionMs by remember { mutableIntStateOf(0) }
+    var durationMs by remember { mutableIntStateOf(0) }
+
+    // Prepare the player once the session is loaded so the scrubber has a length up front.
+    LaunchedEffect(session?.id) {
+        val current = session ?: return@LaunchedEffect
+        val file = vm.repository.audioFile(current.id)
+        if (!file.exists()) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            runCatching {
+                player.reset()
+                player.setDataSource(file.absolutePath)
+                player.prepare()
+            }
+        }
+        player.setOnCompletionListener {
+            playing = false
+            positionMs = 0
+            runCatching { player.seekTo(0) }
+        }
+        durationMs = runCatching { player.duration }.getOrDefault(0)
+            .let { if (it > 0) it else current.meta.durationMs.toInt() }
+        prepared = true
+    }
+
+    // Advance the scrubber while playing.
+    LaunchedEffect(playing) {
+        while (playing) {
+            positionMs = runCatching { player.currentPosition }.getOrDefault(positionMs)
+            delay(200)
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose { runCatching { player.release() } }
     }
@@ -237,28 +277,37 @@ fun RecordingDetailScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             if (s != null) {
+                val total = durationMs.coerceAtLeast(1)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = {
-                        val file = vm.repository.audioFile(s.id)
-                        if (!playing && file.exists()) {
-                            runCatching {
-                                player.reset()
-                                player.setDataSource(file.absolutePath)
-                                player.setOnCompletionListener { playing = false }
-                                player.prepare()
-                                player.start()
-                                playing = true
-                            }
-                        } else {
+                    IconButton(onClick = {
+                        if (!prepared) return@IconButton
+                        if (playing) {
                             runCatching { player.pause() }
                             playing = false
+                        } else {
+                            runCatching { player.start() }
+                            playing = true
                         }
                     }) {
-                        Icon(if (playing) Icons.Filled.Stop else Icons.Filled.PlayArrow, contentDescription = null)
-                        Text(if (playing) "  Stop" else "  Play")
+                        Icon(
+                            if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (playing) "Pause" else "Play",
+                        )
                     }
-                    Spacer(Modifier.fillMaxWidth().weight(1f))
-                    Text(formatDuration(s.meta.durationMs), color = MaterialTheme.colorScheme.primary)
+                    Slider(
+                        value = positionMs.coerceIn(0, total).toFloat(),
+                        onValueChange = {
+                            positionMs = it.toInt()
+                            runCatching { player.seekTo(positionMs) }
+                        },
+                        valueRange = 0f..total.toFloat(),
+                        enabled = prepared,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(formatDuration(positionMs.toLong()), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(formatDuration(durationMs.toLong()), color = MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.height(16.dp))
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
