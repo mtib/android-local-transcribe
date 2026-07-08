@@ -92,7 +92,6 @@ fun RecordingListScreen(
     val partial by RecordingController.partial.collectAsState()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Local Transcribe") }) },
         floatingActionButton = {
             if (!active) {
                 ExtendedFloatingActionButton(
@@ -198,6 +197,8 @@ private fun OngoingCard(
 private fun RecordingCard(session: RecordingSession, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

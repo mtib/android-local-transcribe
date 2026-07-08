@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="graphite">#091013</color>
+    <color name="black">#000000</color>
     <color name="panel">#121821</color>
     <color name="mint">#75E3BE</color>
     <color name="violet">#AFA2FF</color>

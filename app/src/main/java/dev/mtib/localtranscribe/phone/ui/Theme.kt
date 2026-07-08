@@ -5,19 +5,19 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val Graphite = Color(0xFF091013)
-private val Panel = Color(0xFF121821)
+private val Black = Color(0xFF000000)
+private val Panel = Color(0xFF141A22)
 private val Mint = Color(0xFF75E3BE)
 private val Violet = Color(0xFFAFA2FF)
 
 private val Scheme = darkColorScheme(
     primary = Mint,
-    onPrimary = Graphite,
+    onPrimary = Black,
     secondary = Violet,
-    onSecondary = Graphite,
-    background = Graphite,
+    onSecondary = Black,
+    background = Black,
     onBackground = Color(0xFFE6ECF2),
-    surface = Panel,
+    surface = Black,
     onSurface = Color(0xFFE6ECF2),
     surfaceVariant = Panel,
     onSurfaceVariant = Color(0xFFA8B3BF),
