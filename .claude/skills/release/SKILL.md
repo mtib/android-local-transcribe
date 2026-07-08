@@ -37,8 +37,11 @@ Actions does the rest.
 1. JDK 21 + Android SDK set up.
 2. `scripts/fetch-assets.sh` downloads the Parakeet model + Silero VAD + sherpa-onnx AAR
    (cached via `actions/cache`, key `assets-parakeet-v3-sherpa-1.13.3` — only the first run downloads).
-3. If the `DEBUG_KEYSTORE_BASE64` repo secret is set, it restores `~/.android/debug.keystore` so the
+3. If the `DEBUG_KEYSTORE_BASE64` repo secret is set, it's decoded to a temp file and pinned via the
+   `DEBUG_KEYSTORE_PATH` env var (read by the `debug` signingConfig in `app/build.gradle.kts`), so the
    APKs are signed with the **same key as every prior release** (installs as an in-place update).
+   Locally (no `DEBUG_KEYSTORE_PATH`) the build falls back to `~/.android/debug.keystore` — the same
+   key the secret was created from. The keystore is never committed.
 4. `./gradlew :app:assembleRelease` builds the per-ABI APKs.
 5. A GitHub release named `Local Transcribe vX.Y.Z` is published with auto-generated notes and two
    assets attached:

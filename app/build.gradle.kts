@@ -13,14 +13,28 @@ android {
         applicationId = "dev.mtib.localtranscribe"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.0.7"
+        versionCode = 9
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
             // arm64 for the phone/Apple-Silicon emulator, x86_64 for Intel emulators.
             abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+    }
+
+    signingConfigs {
+        // Deterministic signing so releases install as in-place updates. Locally this falls back to
+        // the standard ~/.android/debug.keystore; on CI, DEBUG_KEYSTORE_PATH points at the keystore
+        // restored from the DEBUG_KEYSTORE_BASE64 secret (same key as local), so every build matches.
+        getByName("debug") {
+            System.getenv("DEBUG_KEYSTORE_PATH")?.let { path ->
+                storeFile = file(path)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 

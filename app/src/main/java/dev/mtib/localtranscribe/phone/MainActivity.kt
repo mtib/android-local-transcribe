@@ -8,6 +8,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -87,7 +90,14 @@ private fun AppNav(openActive: MutableState<Boolean>) {
         }
     }
 
-    NavHost(navController = nav, startDestination = "list") {
+    NavHost(
+        navController = nav,
+        startDestination = "list",
+        enterTransition = { fadeIn(tween(110)) },
+        exitTransition = { fadeOut(tween(110)) },
+        popEnterTransition = { fadeIn(tween(110)) },
+        popExitTransition = { fadeOut(tween(110)) },
+    ) {
         composable("list") {
             RecordingListScreen(
                 vm = vm,
