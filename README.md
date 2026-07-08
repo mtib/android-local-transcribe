@@ -6,6 +6,13 @@ The Parakeet-TDT v3 model is bundled inside the APK and runs locally through
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx). There is no cloud, no account, no telemetry,
 and the app does not even hold the `INTERNET` permission.
 
+## Screenshots
+
+<p>
+  <img src="docs/screenshots/recordings-list.jpg" width="280" alt="Recordings list" />
+  <img src="docs/screenshots/playback.jpg" width="280" alt="Playback with scrubber and transcript" />
+</p>
+
 ## Features
 
 - **Minimal UI**: one "New recording" button and a list of past recordings.
