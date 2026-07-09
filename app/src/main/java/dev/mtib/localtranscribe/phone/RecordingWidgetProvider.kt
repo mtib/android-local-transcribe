@@ -59,10 +59,6 @@ class RecordingWidgetProvider : AppWidgetProvider() {
             return if (style == STYLE_ICON) {
                 RemoteViews(context.packageName, R.layout.widget_recording_icon).apply {
                     setImageViewResource(R.id.widget_icon, iconRes)
-                    setInt(
-                        R.id.widget_icon, "setBackgroundResource",
-                        if (recording) R.drawable.widget_circle_bg_recording else R.drawable.widget_circle_bg,
-                    )
                     setOnClickPendingIntent(R.id.widget_root, actionIntent(context, recording))
                 }
             } else {
