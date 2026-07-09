@@ -21,25 +21,36 @@ class RecordingWidgetProvider : AppWidgetProvider() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        appWidgetIds.forEach { editor.remove(styleKey(it)) }
+        appWidgetIds.forEach { editor.remove(styleKey(it)); editor.remove(colorKey(it)) }
         editor.apply()
     }
 
     companion object {
         const val STYLE_CARD = "card"
         const val STYLE_ICON = "icon"
+        const val DEFAULT_ICON_COLOR = 0xFF75E3BE.toInt()
         private const val PREFS = "widget_prefs"
 
         private fun styleKey(id: Int) = "style_$id"
+        private fun colorKey(id: Int) = "color_$id"
 
         fun setStyle(context: Context, id: Int, style: String) {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putString(styleKey(id), style).apply()
         }
 
+        fun setIconColor(context: Context, id: Int, color: Int) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putInt(colorKey(id), color).apply()
+        }
+
         private fun getStyle(context: Context, id: Int): String =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getString(styleKey(id), STYLE_CARD) ?: STYLE_CARD
+
+        private fun getIconColor(context: Context, id: Int): Int =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getInt(colorKey(id), DEFAULT_ICON_COLOR)
 
         /** Refresh every placed widget from the current recording state. Safe from any thread. */
         fun update(context: Context) {
@@ -49,16 +60,19 @@ class RecordingWidgetProvider : AppWidgetProvider() {
         }
 
         private fun render(context: Context, manager: AppWidgetManager, id: Int) {
-            manager.updateAppWidget(id, buildViews(context, getStyle(context, id)))
+            manager.updateAppWidget(id, buildViews(context, id))
         }
 
-        private fun buildViews(context: Context, style: String): RemoteViews {
+        private fun buildViews(context: Context, id: Int): RemoteViews {
+            val style = getStyle(context, id)
             val recording = RecordingController.isRecording.value
             val iconRes = if (recording) R.drawable.ic_widget_stop else R.drawable.ic_shortcut_mic
 
             return if (style == STYLE_ICON) {
                 RemoteViews(context.packageName, R.layout.widget_recording_icon).apply {
                     setImageViewResource(R.id.widget_icon, iconRes)
+                    // Tint the idle mic with the chosen color; keep the stop glyph its native red.
+                    if (!recording) setInt(R.id.widget_icon, "setColorFilter", getIconColor(context, id))
                     setOnClickPendingIntent(R.id.widget_root, actionIntent(context, recording))
                 }
             } else {

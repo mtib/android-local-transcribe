@@ -61,6 +61,17 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".phone.CreateRecordingShortcutActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_mic"
+            android:label="@string/shortcut_new_long"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.CREATE_SHORTCUT" />
+            </intent-filter>
+        </activity>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

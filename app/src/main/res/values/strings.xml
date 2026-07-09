@@ -9,4 +9,5 @@
     <string name="widget_style_title">Widget style</string>
     <string name="widget_style_card">Card</string>
     <string name="widget_style_icon">Icon only</string>
+    <string name="widget_style_icon_color">Icon only — pick a color</string>
 </resources>
