@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Local Transcribe</string>
     <string name="recording_channel_name">Recording</string>
+    <string name="shortcut_new_short">Record</string>
+    <string name="shortcut_new_long">New recording</string>
 </resources>

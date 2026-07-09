@@ -25,12 +25,13 @@ import dev.mtib.localtranscribe.phone.ui.LocalTranscribeTheme
 
 class MainActivity : ComponentActivity() {
     private val openActive = mutableStateOf(false)
+    private val startNew = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleIntent(intent)
-        setContent { LocalTranscribeTheme { AppNav(openActive) } }
+        setContent { LocalTranscribeTheme { AppNav(openActive, startNew) } }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -41,15 +42,17 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_OPEN_ACTIVE, false) == true) openActive.value = true
+        if (intent?.action == ACTION_NEW_RECORDING) startNew.value = true
     }
 
     companion object {
         const val EXTRA_OPEN_ACTIVE = "open_active"
+        const val ACTION_NEW_RECORDING = "dev.mtib.localtranscribe.NEW_RECORDING"
     }
 }
 
 @Composable
-private fun AppNav(openActive: MutableState<Boolean>) {
+private fun AppNav(openActive: MutableState<Boolean>, startNew: MutableState<Boolean>) {
     val nav = rememberNavController()
     val vm: RecordingsViewModel = viewModel()
     val context = LocalContext.current
@@ -87,6 +90,14 @@ private fun AppNav(openActive: MutableState<Boolean>) {
         if (openActive.value) {
             nav.navigate("active")
             openActive.value = false
+        }
+    }
+
+    // Home-screen shortcut (ACTION_NEW_RECORDING) starts a recording immediately.
+    LaunchedEffect(startNew.value) {
+        if (startNew.value) {
+            onNewRecording()
+            startNew.value = false
         }
     }
 
