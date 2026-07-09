@@ -91,7 +91,7 @@ fun RecordingListScreen(
     val active = recording || preparing || finalizing
     val elapsed by RecordingController.elapsedMs.collectAsState()
     val committed by RecordingController.committed.collectAsState()
-    val partial by RecordingController.partial.collectAsState()
+    val pending by RecordingController.pending.collectAsState()
 
     Scaffold(
         floatingActionButton = {
@@ -119,7 +119,7 @@ fun RecordingListScreen(
             ) {
                 if (active) {
                     item(key = "ongoing") {
-                        OngoingCard(preparing, finalizing, elapsed, committed, partial, onOpenActive)
+                        OngoingCard(preparing, finalizing, elapsed, committed, pending, onOpenActive)
                     }
                 }
                 items(sessions, key = { it.id }) { session ->
@@ -136,7 +136,7 @@ private fun OngoingCard(
     finalizing: Boolean,
     elapsedMs: Long,
     committed: String,
-    partial: String,
+    pending: Boolean,
     onClick: () -> Unit,
 ) {
     val label = when {
@@ -144,7 +144,12 @@ private fun OngoingCard(
         finalizing -> "Finalizing…"
         else -> "Recording"
     }
-    val tail = (committed + if (partial.isBlank()) "" else " $partial").trim()
+    val base = committed.trim()
+    val tail = when {
+        base.isNotEmpty() -> base.takeLast(120) + if (pending) " …" else ""
+        pending -> "Listening…"
+        else -> ""
+    }
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -180,7 +185,7 @@ private fun OngoingCard(
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                if (tail.isBlank()) "Listening…" else tail,
+                tail.ifBlank { "…" },
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -223,6 +228,23 @@ private fun RecordingCard(session: RecordingSession, onClick: () -> Unit) {
 }
 
 @Composable
+private fun AnimatedDots(modifier: Modifier = Modifier) {
+    var step by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(400)
+            step = (step + 1) % 3
+        }
+    }
+    Text(
+        ".".repeat(step + 1),
+        modifier = modifier,
+        fontSize = 22.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
 fun ActiveRecordingScreen(onStopped: () -> Unit) {
     val context = LocalContext.current
     val isRecording by RecordingController.isRecording.collectAsState()
@@ -231,7 +253,7 @@ fun ActiveRecordingScreen(onStopped: () -> Unit) {
     val elapsed by RecordingController.elapsedMs.collectAsState()
     val waveform by RecordingController.waveform.collectAsState()
     val committed by RecordingController.committed.collectAsState()
-    val partial by RecordingController.partial.collectAsState()
+    val pending by RecordingController.pending.collectAsState()
 
     // Leave this screen only once the session is fully done (recorded, finalized, and saved),
     // so a stopping session stays visible (as "Finalizing…") instead of vanishing.
@@ -243,7 +265,7 @@ fun ActiveRecordingScreen(onStopped: () -> Unit) {
     }
 
     val transcriptScroll = rememberScrollState()
-    LaunchedEffect(committed, partial) { transcriptScroll.animateScrollTo(transcriptScroll.maxValue) }
+    LaunchedEffect(committed) { transcriptScroll.animateScrollTo(transcriptScroll.maxValue) }
 
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars).padding(24.dp),
@@ -265,12 +287,8 @@ fun ActiveRecordingScreen(onStopped: () -> Unit) {
             Modifier.fillMaxWidth().weight(1f).verticalScroll(transcriptScroll),
         ) {
             Text(committed, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
-            if (partial.isNotBlank()) {
-                Text(
-                    (if (committed.isBlank()) "" else " ") + partial,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (pending) {
+                AnimatedDots(modifier = Modifier.padding(top = if (committed.isBlank()) 0.dp else 8.dp))
             }
         }
         Spacer(Modifier.height(16.dp))

@@ -61,10 +61,13 @@ class RecordingService : Service() {
     private fun statusText(): String {
         if (RecordingController.isPreparing.value) return "Loading model…"
         val elapsed = formatDuration(RecordingController.elapsedMs.value)
-        val committed = RecordingController.committed.value
-        val partial = RecordingController.partial.value
-        val tail = (committed + if (partial.isBlank()) "" else " $partial").trim()
-        val snippet = if (tail.isBlank()) "Listening…" else tail.takeLast(80)
+        val committed = RecordingController.committed.value.trim()
+        val pending = RecordingController.pending.value
+        val snippet = when {
+            committed.isNotEmpty() -> committed.takeLast(80) + if (pending) " …" else ""
+            pending -> "Listening…"
+            else -> "…"
+        }
         return "$elapsed  •  $snippet"
     }
 

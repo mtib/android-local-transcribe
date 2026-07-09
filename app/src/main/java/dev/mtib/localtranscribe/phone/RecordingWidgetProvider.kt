@@ -105,10 +105,13 @@ class RecordingWidgetProvider : AppWidgetProvider() {
         }
 
         private fun snippet(): String {
-            val committed = RecordingController.committed.value
-            val partial = RecordingController.partial.value
-            val tail = (committed + if (partial.isBlank()) "" else " $partial").trim()
-            return if (tail.isBlank()) "Listening…" else tail.takeLast(60)
+            val committed = RecordingController.committed.value.trim()
+            val pending = RecordingController.pending.value
+            return when {
+                committed.isNotEmpty() -> committed.takeLast(60) + if (pending) " …" else ""
+                pending -> "Listening…"
+                else -> "…"
+            }
         }
 
         private fun actionIntent(context: Context, recording: Boolean): PendingIntent =

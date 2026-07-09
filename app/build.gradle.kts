@@ -13,8 +13,8 @@ android {
         applicationId = "dev.mtib.localtranscribe"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.0.13"
+        versionCode = 15
+        versionName = "1.0.14"
 
         // onnxruntime execution provider for the recognizer. Override with -PasrProvider=nnapi to
         // build a variant that offloads to the NNAPI accelerator (falls back to CPU if none).

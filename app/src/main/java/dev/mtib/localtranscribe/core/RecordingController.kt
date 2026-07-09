@@ -59,7 +59,7 @@ object RecordingController {
     val lastCompletedId: StateFlow<String?> = _lastCompletedId.asStateFlow()
 
     val committed: StateFlow<String> get() = engine.committed
-    val partial: StateFlow<String> get() = engine.partial
+    val pending: StateFlow<Boolean> get() = engine.pending
 
     private const val WAVEFORM_BARS = 96
 

@@ -22,8 +22,9 @@ import kotlinx.coroutines.launch
 /**
  * On-device speech-to-text: Parakeet-TDT v3 ([OfflineRecognizer]) segmented by Silero [Vad].
  * Audio capture calls [submit] from any thread; a dedicated coroutine runs VAD + decoding so
- * inference never blocks the microphone. Finalized phrases accumulate in [committed]; the
- * in-progress phrase is decoded periodically into [partial] for a live scrolling transcript.
+ * inference never blocks the microphone. Each speech segment is decoded once, on finalize, into
+ * [committed]. [pending] is true while speech is being captured but not yet committed, so the UI
+ * can show an unobtrusive indicator instead of a churning live preview.
  */
 class TranscriptionEngine {
     private var recognizer: OfflineRecognizer? = null
@@ -32,8 +33,8 @@ class TranscriptionEngine {
     private val _committed = MutableStateFlow("")
     val committed: StateFlow<String> = _committed.asStateFlow()
 
-    private val _partial = MutableStateFlow("")
-    val partial: StateFlow<String> = _partial.asStateFlow()
+    private val _pending = MutableStateFlow(false)
+    val pending: StateFlow<Boolean> = _pending.asStateFlow()
 
     private var channel: Channel<FloatArray>? = null
     private var job: Job? = null
@@ -85,7 +86,7 @@ class TranscriptionEngine {
         v.reset()
         v.clear()
         _committed.value = ""
-        _partial.value = ""
+        _pending.value = false
         val ch = Channel<FloatArray>(capacity = Channel.UNLIMITED)
         channel = ch
         job = scope.launch(Dispatchers.Default) { consume(ch) }
@@ -107,8 +108,6 @@ class TranscriptionEngine {
     private suspend fun consume(ch: Channel<FloatArray>) {
         val v = vad ?: return
         var carry = FloatArray(0)
-        val partialBuf = ArrayList<Float>()
-        var lastPartialNs = 0L
 
         fun process(block: FloatArray) {
             val combined = if (carry.isEmpty()) block else carry + block
@@ -118,31 +117,15 @@ class TranscriptionEngine {
                 offset += WINDOW_SIZE
             }
             carry = if (offset < combined.size) combined.copyOfRange(offset, combined.size) else FloatArray(0)
-            if (v.isSpeechDetected()) {
-                for (s in block) partialBuf.add(s)
-            } else {
-                partialBuf.clear()
-                _partial.value = ""
-            }
-            drainSegments(v, partialBuf)
+            drainSegments(v)
+            _pending.value = v.isSpeechDetected()
         }
 
         for (block in ch) {
             process(block)
-            // Prioritize ingestion: drain everything already queued before spending time on a
-            // partial. If a backlog built up, the device isn't keeping up, so skip the partial.
-            var backlog = 0
             while (true) {
                 val more = ch.tryReceive().getOrNull() ?: break
                 process(more)
-                backlog++
-            }
-            val now = System.nanoTime()
-            if (backlog <= 1 && v.isSpeechDetected() && partialBuf.isNotEmpty() &&
-                now - lastPartialNs >= PARTIAL_MIN_INTERVAL_NS
-            ) {
-                lastPartialNs = now
-                _partial.value = decode(cappedTail(partialBuf, PARTIAL_MAX_SECONDS))
             }
         }
 
@@ -150,11 +133,11 @@ class TranscriptionEngine {
             v.acceptWaveform(carry + FloatArray(WINDOW_SIZE - carry.size))
         }
         v.flush()
-        drainSegments(v, partialBuf)
-        _partial.value = ""
+        drainSegments(v)
+        _pending.value = false
     }
 
-    private fun drainSegments(v: Vad, partialBuf: ArrayList<Float>) {
+    private fun drainSegments(v: Vad) {
         while (!v.empty()) {
             val segment = v.front()
             v.pop()
@@ -163,17 +146,7 @@ class TranscriptionEngine {
                 val current = _committed.value
                 _committed.value = if (current.isEmpty()) text else "$current $text"
             }
-            partialBuf.clear()
-            _partial.value = ""
         }
-    }
-
-    private fun cappedTail(buf: ArrayList<Float>, seconds: Int): FloatArray {
-        val max = SAMPLE_RATE * seconds
-        val from = if (buf.size > max) buf.size - max else 0
-        val out = FloatArray(buf.size - from)
-        for (i in out.indices) out[i] = buf[from + i]
-        return out
     }
 
     /** One-shot decode of a whole clip (16 kHz mono). Used by tests and any batch path. */
@@ -202,10 +175,5 @@ class TranscriptionEngine {
     companion object {
         const val SAMPLE_RATE = 16000
         const val WINDOW_SIZE = 512
-
-        /** Live partials are decoded at most this often, and only over the recent tail, so they
-         *  never starve audio ingestion on slower devices. */
-        private const val PARTIAL_MAX_SECONDS = 2
-        private const val PARTIAL_MIN_INTERVAL_NS = 600_000_000L
     }
 }
