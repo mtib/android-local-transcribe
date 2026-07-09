@@ -4,4 +4,9 @@
     <string name="recording_channel_name">Recording</string>
     <string name="shortcut_new_short">Record</string>
     <string name="shortcut_new_long">New recording</string>
+    <string name="widget_idle_label">Tap to record</string>
+    <string name="widget_description">Start or stop a recording</string>
+    <string name="widget_style_title">Widget style</string>
+    <string name="widget_style_card">Card</string>
+    <string name="widget_style_icon">Icon only</string>
 </resources>

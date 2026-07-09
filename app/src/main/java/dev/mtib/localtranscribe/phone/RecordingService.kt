@@ -52,6 +52,7 @@ class RecordingService : Service() {
             val manager = getSystemService(NotificationManager::class.java)
             while (true) {
                 manager.notify(NOTIF_ID, buildNotification(statusText()))
+                RecordingWidgetProvider.update(this@RecordingService)
                 delay(1000)
             }
         }
@@ -70,6 +71,7 @@ class RecordingService : Service() {
     private fun stopRecording() {
         RecordingController.launchStop {
             releaseWakeLock()
+            RecordingWidgetProvider.update(this)
             stopForegroundCompat()
             stopSelf()
         }
