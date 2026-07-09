@@ -47,6 +47,8 @@ Actions does the rest.
    assets attached:
    - `android-local-transcribe-vX.Y.Z-arm64.apk` (arm64-v8a — recommended for phones)
    - `android-local-transcribe-vX.Y.Z.apk` (universal)
+   - `android-local-transcribe-vX.Y.Z-arm64-nnapi.apk` (arm64, built with `-PasrProvider=nnapi` —
+     experimental NNAPI/accelerator offload; falls back to CPU if no accelerator)
 
 ## Verify
 

@@ -1,6 +1,7 @@
 package dev.mtib.localtranscribe.core.asr
 
 import android.content.Context
+import dev.mtib.localtranscribe.BuildConfig
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
@@ -57,6 +58,7 @@ class TranscriptionEngine {
                     tokens = m.parakeetTokens,
                     modelType = "nemo_transducer",
                     numThreads = threads,
+                    provider = BuildConfig.ASR_PROVIDER,
                 ),
                 decodingMethod = "greedy_search",
             ),
@@ -69,7 +71,7 @@ class TranscriptionEngine {
                     minSilenceDuration = 0.25f,
                     minSpeechDuration = 0.25f,
                     windowSize = WINDOW_SIZE,
-                    maxSpeechDuration = 8.0f,
+                    maxSpeechDuration = 5.0f,
                 ),
                 sampleRate = SAMPLE_RATE,
                 numThreads = 1,
@@ -106,9 +108,9 @@ class TranscriptionEngine {
         val v = vad ?: return
         var carry = FloatArray(0)
         val partialBuf = ArrayList<Float>()
-        var samplesSincePartial = 0
+        var lastPartialNs = 0L
 
-        for (block in ch) {
+        fun process(block: FloatArray) {
             val combined = if (carry.isEmpty()) block else carry + block
             var offset = 0
             while (offset + WINDOW_SIZE <= combined.size) {
@@ -116,21 +118,32 @@ class TranscriptionEngine {
                 offset += WINDOW_SIZE
             }
             carry = if (offset < combined.size) combined.copyOfRange(offset, combined.size) else FloatArray(0)
-
             if (v.isSpeechDetected()) {
                 for (s in block) partialBuf.add(s)
-                samplesSincePartial += block.size
-                if (samplesSincePartial >= SAMPLE_RATE / 2) { // ~0.5s cadence
-                    samplesSincePartial = 0
-                    _partial.value = decode(cappedTail(partialBuf))
-                }
             } else {
                 partialBuf.clear()
-                samplesSincePartial = 0
                 _partial.value = ""
             }
-
             drainSegments(v, partialBuf)
+        }
+
+        for (block in ch) {
+            process(block)
+            // Prioritize ingestion: drain everything already queued before spending time on a
+            // partial. If a backlog built up, the device isn't keeping up, so skip the partial.
+            var backlog = 0
+            while (true) {
+                val more = ch.tryReceive().getOrNull() ?: break
+                process(more)
+                backlog++
+            }
+            val now = System.nanoTime()
+            if (backlog <= 1 && v.isSpeechDetected() && partialBuf.isNotEmpty() &&
+                now - lastPartialNs >= PARTIAL_MIN_INTERVAL_NS
+            ) {
+                lastPartialNs = now
+                _partial.value = decode(cappedTail(partialBuf, PARTIAL_MAX_SECONDS))
+            }
         }
 
         if (carry.isNotEmpty()) {
@@ -155,8 +168,8 @@ class TranscriptionEngine {
         }
     }
 
-    private fun cappedTail(buf: ArrayList<Float>): FloatArray {
-        val max = SAMPLE_RATE * 8
+    private fun cappedTail(buf: ArrayList<Float>, seconds: Int): FloatArray {
+        val max = SAMPLE_RATE * seconds
         val from = if (buf.size > max) buf.size - max else 0
         val out = FloatArray(buf.size - from)
         for (i in out.indices) out[i] = buf[from + i]
@@ -189,5 +202,10 @@ class TranscriptionEngine {
     companion object {
         const val SAMPLE_RATE = 16000
         const val WINDOW_SIZE = 512
+
+        /** Live partials are decoded at most this often, and only over the recent tail, so they
+         *  never starve audio ingestion on slower devices. */
+        private const val PARTIAL_MAX_SECONDS = 2
+        private const val PARTIAL_MIN_INTERVAL_NS = 600_000_000L
     }
 }
